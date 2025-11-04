@@ -4,27 +4,18 @@ namespace Mateffy\JobProgress\Tests;
 
 use Mateffy\JobProgress\Data\JobState;
 use Mateffy\JobProgress\Data\JobStatus;
+use Mateffy\JobProgress\Tests\Data\News;
 use Mateffy\JobProgress\Tests\Jobs\FailingJob;
 use Mateffy\JobProgress\Tests\Jobs\SimpleJob;
 use Throwable;
 
 describe('Progress', function () {
     beforeEach(function () {
-        $this->mockNews();
+        News::fake();
     });
 
     it('can be implemented', function () {
-        $mock = $this->mockNews();
-
-        $mock
-            ->shouldReceive('recent')
-            ->once()
-            ->andReturn(collect([1, 2, 3]));
-
-        $mock
-            ->shouldReceive('process')
-            ->times(3)
-            ->andReturnNull();
+        $news = News::expectRecentProcessing(3);
 
         $id = uniqid();
         $progress = SimpleJob::getProgress($id, createIfMissing: true);
@@ -41,6 +32,8 @@ describe('Progress', function () {
             ->and($progress->status)->toBe(JobStatus::Completed)
             ->and($progress->progress)->toBe(1.0)
             ->and($progress->result)->toBe('end_result_data');
+
+        expect($news->counter)->toBe(3);
     });
 
     it('can fail and caught', function () {

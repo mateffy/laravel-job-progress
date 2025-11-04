@@ -26,15 +26,6 @@ class TestCase extends Orchestra
         ];
     }
 
-    public function mockNews(): News&Mockery\MockInterface
-    {
-        $mock = Mockery::mock(News::class);
-
-        $this->instance(News::class, $mock);
-
-        return $mock;
-    }
-
     public function getEnvironmentSetUp($app)
     {
         config()->set('database.default', 'testing');

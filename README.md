@@ -1,4 +1,8 @@
-# Laravel Job Progress
+<div>
+    <img src="./docs/elephant.svg" />
+</div>
+
+# Job Progress for Laravel Queues
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/mateffy/laravel-job-progress.svg?style=flat-square)](https://packagist.org/packages/mateffy/laravel-job-progress)
 
@@ -6,7 +10,7 @@ Track and show progress of your background jobs (for progress bar UIs etc.) usin
 
 <br />
 
-## Usage
+## Installation
 
 You can install the package via composer:
 
@@ -25,13 +29,22 @@ class SimpleJob implements ShouldQueue, HasJobProgress
     use Queueable;
     use Progress;
 
+    /** 
+     * Return a unique ID for this job instance, 
+     * using which you can access progress outside the job 
+     */
     public function getProgressId(): string {}
 
+    /** 
+     * Implement your job handler here.
+     */
     public function handleWithProgress(): void {}
 }
 ```
 
-### Updating the progress
+<br />
+
+## Updating the progress
 
 Inside a job handler, you have access to the `$this->progress()` method, returning an up-to-date `JobState` object.
 This is the primary way to interact with job progress from inside a running job.
@@ -58,7 +71,7 @@ public function handleWithProgress(): void
 }
 ```
 
-#### List-based progress
+### List-based progress
 
 If you're working with a list of items, the package provides a simple helper method to update the progress based on the current item index and the total number of items.
 Using this method, you don't need to manually calculate the progress percentage yourself and can avoid dealing with math errors (e.g. division by zero).
@@ -87,7 +100,9 @@ public function handleWithProgress(): void
 }
 ```
 
-### Accessing the progress outside the job
+<br />
+
+## Accessing the progress outside the job
 
 You can access the job state from outside the job by using the `getProgress` on the job class.
 All you need to know is the unique job ID (not the full cache key).
@@ -106,7 +121,9 @@ $state->result; // mixed, your own custom result data
 $state->error; // ?string, error message if the job failed
 ```
 
-### Cancelling the job
+<br />
+
+## Cancelling the job
 
 This package supports job cancellation.
 This allows a user or the system to cancel a job while it's still running, stopping it from completing.
@@ -163,10 +180,36 @@ $state = UniqueIDJob::getProgress($id);
 $state->cancel();
 ```
 
-Now, if you have a job that has a point of no return after progressing to 80%, 
-we'd also like to be able to determine if a job can still be cancelled.
-To configure this,
+<br />
 
+## Progress Lifecycle
+
+The progress goes through multiple steps as it's executed.
+These are indicated by the `JobStatus` enum, available using `$state->status`.
+
+| Status | Description |
+| --- | --- |
+| JobStatus::Pending | The job is waiting to be executed. |
+| JobStatus::Processing | The job is currently running. |
+| JobStatus::Completed | The job has completed successfully. |
+| JobStatus::Failed | The job has failed. An `$error` message is available. |
+| JobStatus::Cancelled | The job has been cancelled. |
+
+You don't have to manually mark jobs as `processing`, `completed` or `failed`, as the `Progress` trait and `handleWithProgress` method will take care of this for you (e.g. by catching exceptions).
+
+### Locking jobs
+
+The `pending` status can be used to obtain a lock on a job, preventing it from being executed multiple times. Using the `Job::lock($id)` method makes this super easy to setup when dispatching the job.
+
+```php
+if (MyJob::lock($id)) {
+    MyJob::dispatch($id, ...);
+}
+```
+
+The `lock` method will return `null` if any state _already exists_ (even if only `pending`). Otherwise it will create new state and return it.
+
+<br />
 
 ## Defining Progress IDs
 
@@ -259,7 +302,9 @@ class MyLivewire extends Component
 }
 ```
 
-### Customizing the cache prefix/key, duration or the cache store
+<br />
+
+## Customizing the cache prefix/key, duration or the cache store
 
 The default cache key template is `job-progress:{job-class}:{id}`.
 This way, IDs are automatically scoped to the job class, so you don't have to worry about accidentally using the same ID for multiple different kind of jobs.
@@ -269,8 +314,6 @@ you can override the `::getProgressConfig()` method of the `Progress` trait and 
 See [`JobProgressConfig`](./src/JobProgressConfig.php) for all available options.
 
 <br />
-
-
 
 ## FAQ
 
@@ -291,7 +334,7 @@ job itself. This state can also be accessed from outside the job by using the sa
 ### How does job cancelling work?
 
 Using the same state mechanism as the progress tracking, the job can also be marked as `cancelled`, which alone does
-not cancel the job. Instead, the job should define "safe checkpoints" where a cancellation check accurs and the job can be
+not cancel the job. Instead, you have to define "cancellation checkpoints" yourself, where a cancellation check accurs and the job can be
 potentially stopped.
 
 ### Why is there a need for the `handleWithProgress` method? Can't I just keep using the `handle` method?
@@ -299,41 +342,40 @@ potentially stopped.
 One difficulty with implementing background job progress is the issue of stalled / failed jobs.
 If your job code throws an exception in the `handle` method, there's no way for the job status to be updated accordingly, leading to a bad UX.
 The `Progress` trait of this package actually implements your `handle` method so that any exceptions thrown are caught and the job status is updated accordingly.
-The same applies to job cancellation, as this is also implemented using a `Throwable` class which is caught in the trait.
+The same applies to job cancellation, as this is also implemented using an `Exception` class which is caught in the trait and handled appropriately.
 
 #### Okay then, but why not use job middleware?
 
 Great question! I'd really like to use job middleware for this, but this would unfortunately make everything a bit more fragile.
 First of all, we'd have to prefill the `middleware()` method for you somehow, either inside the trait or by forcing you to extend some kind of base class.
 If you now want to add your own middleware (for example for throttling etc.), you'd need to remember to re-add the progress middleware.
-For this you'd have to use the awkward `use` syntax to call the trait's `middleware()` method or loose "class freedom" by needing to extend our base class.
-In any case, forgetting to include the middleware again would result in a buggy and broken system with no indication/syntax error beforehand.
+For this you'd have to use the awkward `use` syntax to rename and call the `Progress` trait's `middleware()` method or loose "class freedom" by needing to extend a base class.
+In any case, forgetting to include the progress middleware would result in a buggy and broken system with no indication/syntax error beforehand.
 
 I'm in the progress of writing a PR that let's job middleware also be defined in traits using `middlewareTraitName()` methods, 
-similar to `bootTraitName()` or `mountTraitName()` in Eloquent/Livewire. However, I'm not sure if this is the best solution either, as middleware can be reordered, possibly leading to undefined behaviour.
+similar to `bootTraitName()` or `mountTraitName()` in Eloquent/Livewire. However, I'm not sure if this is the best solution either, as middleware can be reordered, possibly leading to more undefined behaviour.
 
 In any case, defining an abstract `handleWithProgress` method in the trait/interface and requiring you to implement it in your job class is a much stricter and safer solution for now.
 
 ### Why use the cache and not DB?
 
-This package looks at job progress as something temporary. The cache is built to store data for a short period of time, 
-without having to worry about cleaning up old data manually.
+This package looks at job progress as something temporary. The cache is built to store data for a short period of time, without having to worry about cleaning up old data manually (using TTLs).
 
-Using the cache also avoids needing migrations, so it doesn't introduce any kind of statefulness to your application itself.
-It's also good practice to clear the application cache when deploying new code anyway, which avoids the issue of differing class definitions or your result data.
-Change your result classes all you want, and no invalid / old data will be left behind.
+Using the cache also avoids needing migrations, so it doesn't introduce any kind of statefulness to your application or codebase itself.
+It's also good practice to clear the application cache when deploying new code anyway, which avoids the issue of differing class definitions when unserializing job results. Change your result classes all you want, no invalid / old data will be left behind when using the cache (and clearing it on deployment).
 
 One downside of using the cache is that it doesn't easily support listing all running job states, as there's no single table to query.
 This was explicitly not a requirement for this package, and it's not something I'm planning to add.
 However, if you really need this functionality, you could implement it yourself based on the cache backend you're using.
 For example, if you're using Redis, you could use the [`SCAN` command](https://redis.io/docs/latest/commands/scan) to list all keys matching a certain pattern.
 
-If you _really_ need the state to be stored as a DB model, you can have a look at [Tiger Fok's laravel-job-status package](https://github.com/imTigger/laravel-job-status),
-which uses a custom DB table to store job states. However, it doesn't support all of the features of this package, and doesn't look to be actively maintained.
+If you _really_ need the state to be stored as a DB model instead, you can have a look at [Tiger Fok's laravel-job-status package](https://github.com/imTigger/laravel-job-status), which uses a custom DB table to store job states. However, it doesn't support all of the features of this package, and doesn't look to be actively maintained.
 
 ### Is this package production ready?
 
 This package is used in production at [immocore](https://immocore.com) to power our AI data extraction pipeline UIs.
+
+The package is also thoroughly tested and documented. I'm planning on keeping the API stable, with changes being backwards compatible as much as possible.
 
 <br />
 
@@ -341,6 +383,8 @@ This package is used in production at [immocore](https://immocore.com) to power 
 
 - [laravel-job-status](https://github.com/imTigger/laravel-job-status) by Tiger Fok
 
+<br />
+
 ## License
 
-The MIT License (MIT). Please see [License File](LICENSE.md) for more information.
+Open-Source using the MIT License. Please see the [License File](LICENSE.md) for more information.

@@ -14,9 +14,9 @@ use Throwable;
  */
 class JobProgressConfig
 {
-    public const string DEFAULT_CACHE_PREFIX = 'job-progress';
+    public const string DEFAULT_CACHE_PREFIX = "job-progress";
     public const int DEFAULT_CACHE_DURATION = 60 * 15; // 15 minutes
-    public const string DEFAULT_CACHE_STORE = 'default';
+    public const string DEFAULT_CACHE_STORE = "default";
     public const float DEFAULT_CANCEL_THRESHOLD = 0.0;
 
     public function __construct(
@@ -28,9 +28,7 @@ class JobProgressConfig
         protected ?Closure $make_cache_key,
 
         protected float $cancel_threshold,
-    )
-    {
-    }
+    ) {}
 
     /**
      * Get the cache store that job progress / status should be stored in.
@@ -53,9 +51,10 @@ class JobProgressConfig
      */
     public function getCachePrefix(): string
     {
-        $prefix = $this->cache_prefix instanceof Closure
-            ? ($this->cache_prefix)()
-            : $this->cache_prefix;
+        $prefix =
+            $this->cache_prefix instanceof Closure
+                ? ($this->cache_prefix)()
+                : $this->cache_prefix;
 
         return $prefix ?? self::DEFAULT_CACHE_PREFIX;
     }
@@ -92,12 +91,12 @@ class JobProgressConfig
     {
         if ($this->make_cache_key) {
             return app()->call($this->make_cache_key, [
-                'job' => $job,
-                'id' => $id,
+                "job" => $job,
+                "id" => $id,
             ]);
         }
 
-        $hash = hash('xxh3', $job);
+        $hash = hash("xxh3", $job);
         $prefix = $this->getCachePrefix();
 
         return "{$prefix}:{$hash}:{$id}";
@@ -116,7 +115,7 @@ class JobProgressConfig
             id: $id,
             job: $job,
             status: JobStatus::Pending,
-            progress: 0.0
+            progress: 0.0,
         );
 
         $this->saveJobProgress($progress);
@@ -131,7 +130,10 @@ class JobProgressConfig
      */
     public function saveJobProgress(JobState $progress): void
     {
-        $cacheKey = $this->composeCacheKey(job: $progress->job, id: $progress->id);
+        $cacheKey = $this->composeCacheKey(
+            job: $progress->job,
+            id: $progress->id,
+        );
 
         cache()->put($cacheKey, $progress, ttl: $this->getCacheDuration());
     }
@@ -161,7 +163,6 @@ class JobProgressConfig
         return null;
     }
 
-
     /**
      * @param class-string<HasJobProgress> $job
      * @param string $id
@@ -174,7 +175,29 @@ class JobProgressConfig
         return match ($state?->status) {
             default => false,
             null, JobStatus::Pending, JobStatus::Cancelled => true,
-            JobStatus::Processing => $state->progress < $this->getCancelThreshold(),
+            JobStatus::Processing => $state->progress <
+                $this->getCancelThreshold(),
         };
+    }
+
+    /**
+     * Obtain a lock on this job by only returning a new JobState if none with the ID exist already.
+     *
+     * Useful to only dispatch jobs once safely.
+     * This method will also mark the job as pending before it's even executed.
+     *
+     * @param class-string<HasJobProgress> $job
+     * @param string $id
+     * @return ?JobState
+     */
+    public function lock(string $job, string $id): ?JobState
+    {
+        $state = $this->getJobProgress(job: $job, id: $id);
+
+        if ($state) {
+            return null;
+        }
+
+        return $this->createPendingState(job: $job, id: $id);
     }
 }

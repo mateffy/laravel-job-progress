@@ -146,4 +146,32 @@ trait Progress
         return app(JobProgressConfig::class, $params);
     }
 
+    /**
+     * Mark a job with a given ID as pending.
+     *
+     * Warning: this method will overwrite any existing progress state,
+     * and will cause undefined behaviour if a job is currently executing.
+     *
+     * Make sure to check for currently running jobs before!
+     */
+    public static function markAsPending(string $id): JobState
+    {
+        return static::getProgress(id: $id, createIfMissing: true)
+            ->reset();
+    }
+
+    /**
+     * Mark a job with a given ID as pending.
+     *
+     * Warning: this method will overwrite any existing progress state,
+     * and will cause undefined behaviour if a job is currently executing.
+     *
+     * Make sure to check for currently running jobs before!
+     *
+     * @return ?JobState The pending job state for this ID, if none exist already.
+     */
+    public static function lock(string $id): ?JobState
+    {
+        return static::getProgressConfig()->lock(static::class, id: $id);
+    }
 }

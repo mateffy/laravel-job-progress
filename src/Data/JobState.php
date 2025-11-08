@@ -19,16 +19,14 @@ class JobState
         public string $id,
         /** @var class-string<HasJobProgress> $job */
         public string $job,
-        public JobStatus  $status,
+        public JobStatus $status,
         public float $progress,
         public ?string $error = null,
 
         /** @var T $result */
         public $result = null,
         protected ?JobProgressConfig $config = null,
-    )
-    {
-    }
+    ) {}
 
     public function getProgressConfig(): JobProgressConfig
     {
@@ -47,7 +45,7 @@ class JobState
     {
         $refreshed = $this->getProgressConfig()->getJobProgress(
             job: $this->job,
-            id: $this->id
+            id: $this->id,
         );
 
         if ($refreshed) {
@@ -105,8 +103,7 @@ class JobState
         mixed $result = null,
         float|null $max = null,
         float|null $base = null,
-    ): self
-    {
+    ): self {
         // Make sure the values work correctly.
         // By clamping the maximum to 100% - the base, we make sure that the maximum is never exceeded.
         $baseFloat = Math::clamp($base ?? 0.0, min: 0, max: 100.0);
@@ -118,12 +115,10 @@ class JobState
 
         // Calculate the new progress.
         // Make sure we don't divide by 0.
-        $fraction = $total === 0
-            ? 0.0
-            : $completed / $total;
+        $fraction = $total === 0 ? 0.0 : $completed / $total;
 
         // Calculate the new total by adding the base and multiplying the max possible value by the fraction
-        $total = $baseFloat + ($maxFloat * $fraction);
+        $total = $baseFloat + $maxFloat * $fraction;
 
         // Make sure the total is within the range of 0-100.
         // Handle using fallback value
@@ -136,10 +131,7 @@ class JobState
             $total = 100.0;
         }
 
-        return $this->update(
-            progress: $total,
-            result: $result,
-        );
+        return $this->update(progress: $total, result: $result);
     }
 
     /**
@@ -185,6 +177,29 @@ class JobState
     }
 
     /**
+     * Set the status back to pending and reset progress, result and error values of this state.
+     *
+     * Useful to ensure the job state is marked as pending.
+     * Note that this method will NOT check if the job is currently running
+     * and will mindlessly override.
+     *
+     * Make sure no job is currently executing or this will cause undefined behavior.
+     */
+    public function reset(): self
+    {
+        $this->refresh();
+
+        $this->error = null;
+        $this->progress = 0.0;
+        $this->result = null;
+        $this->status = JobStatus::Pending;
+
+        $this->getProgressConfig()->saveJobProgress($this);
+
+        return $this;
+    }
+
+    /**
      * Tries to cancel the job by marking it as cancelled and saving the progress.
      * This method DOES NOT throw JobWasCancelled to stop any current execution, so it's safe to use outside jobs.
      *
@@ -199,7 +214,7 @@ class JobState
     public function cancel(): self
     {
         if (!$this->canBeCancelled()) {
-            throw new JobCannotBeCancelled;
+            throw new JobCannotBeCancelled();
         }
 
         $this->refresh();
@@ -260,7 +275,7 @@ class JobState
     {
         return $this->getProgressConfig()->canBeCancelled(
             job: $this->job,
-            id: $this->id
+            id: $this->id,
         );
     }
 
@@ -274,21 +289,19 @@ class JobState
             $total = 0.0;
 
             for ($i = 0; $i < $steps; $i++) {
-                $isLast = $i === ($steps - 1);
+                $isLast = $i === $steps - 1;
 
                 // Try to avoid rounding errors as best as possible
                 // by calculating the rest needed until 100.0.
                 // If $size has precision errors (too large / too small)
                 // this will simply adjust the last split by a tiny amount.
-                $safeSize = $isLast
-                    ? $size
-                    : 100.0 - $total;
+                $safeSize = $isLast ? $size : 100.0 - $total;
 
                 $splits[] = new ProgressSplit(
                     state: $this,
                     base: $total,
                     size: $safeSize,
-                    completes: $isLast
+                    completes: $isLast,
                 );
             }
         } else {
@@ -306,9 +319,7 @@ class JobState
             if ($total === 0) {
                 $size = 100.0 / $count;
 
-                $steps = collect($steps)
-                    ->map(fn (int $step) => $size)
-                    ->all();
+                $steps = collect($steps)->map(fn(int $step) => $size)->all();
 
                 $total = 1.0;
             }
@@ -318,7 +329,7 @@ class JobState
             $splits = [];
 
             foreach ($steps as $i => $step) {
-                $isLast = $i === ($count - 1);
+                $isLast = $i === $count - 1;
 
                 // Calculate the sa
                 $safeSize = $step / $fraction;
@@ -327,7 +338,7 @@ class JobState
                     state: $this,
                     base: $total,
                     size: $safeSize,
-                    completes: $isLast
+                    completes: $isLast,
                 );
             }
         }

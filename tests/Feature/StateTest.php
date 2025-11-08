@@ -34,7 +34,7 @@ describe('State', function () {
             ->and($progress->result)->toBe('abcde');
     });
 
-    it('is scoped to job', function () {
+    test('is scoped to job', function () {
         $progress = SimpleJob::getProgress('abc', createIfMissing: true);
         $progress2 = FailingJob::getProgress('abc', createIfMissing: true);
 
@@ -157,7 +157,7 @@ describe('State', function () {
 });
 
 describe('JobStatus', function () {
-    it('isPending() helper method', function () {
+    test('isPending() helper method', function () {
         expect(JobStatus::Pending->isPending())->toBeTrue()
             ->and(JobStatus::Processing->isPending())->toBeFalse()
             ->and(JobStatus::Completed->isPending())->toBeFalse()
@@ -165,7 +165,7 @@ describe('JobStatus', function () {
             ->and(JobStatus::Cancelled->isPending())->toBeFalse();
     });
 
-    it('isRunning() helper method', function () {
+    test('isRunning() helper method', function () {
         expect(JobStatus::Pending->isRunning())->toBeTrue()
             ->and(JobStatus::Processing->isRunning())->toBeTrue()
             ->and(JobStatus::Completed->isRunning())->toBeFalse()
@@ -173,7 +173,7 @@ describe('JobStatus', function () {
             ->and(JobStatus::Cancelled->isRunning())->toBeFalse();
     });
 
-    it('isProcessing() helper method', function () {
+    test('isProcessing() helper method', function () {
         expect(JobStatus::Pending->isProcessing())->toBeFalse()
             ->and(JobStatus::Processing->isProcessing())->toBeTrue()
             ->and(JobStatus::Completed->isProcessing())->toBeFalse()
@@ -181,7 +181,7 @@ describe('JobStatus', function () {
             ->and(JobStatus::Cancelled->isProcessing())->toBeFalse();
     });
 
-    it('isFailed() helper method', function () {
+    test('isFailed() helper method', function () {
         expect(JobStatus::Pending->isFailed())->toBeFalse()
             ->and(JobStatus::Processing->isFailed())->toBeFalse()
             ->and(JobStatus::Completed->isFailed())->toBeFalse()
@@ -189,7 +189,7 @@ describe('JobStatus', function () {
             ->and(JobStatus::Cancelled->isFailed())->toBeFalse();
     });
 
-    it('isCompleted() helper method', function () {
+    test('isCompleted() helper method', function () {
         expect(JobStatus::Pending->isCompleted())->toBeFalse()
             ->and(JobStatus::Processing->isCompleted())->toBeFalse()
             ->and(JobStatus::Completed->isCompleted())->toBeTrue()
@@ -197,7 +197,7 @@ describe('JobStatus', function () {
             ->and(JobStatus::Cancelled->isCompleted())->toBeFalse();
     });
 
-    it('isFinished() helper method', function () {
+    test('isFinished() helper method', function () {
         expect(JobStatus::Pending->isFinished())->toBeFalse()
             ->and(JobStatus::Processing->isFinished())->toBeFalse()
             ->and(JobStatus::Completed->isFinished())->toBeTrue()
@@ -205,7 +205,7 @@ describe('JobStatus', function () {
             ->and(JobStatus::Cancelled->isFinished())->toBeTrue();
     });
 
-    it('isCancelled() helper method', function () {
+    test('isCancelled() helper method', function () {
         expect(JobStatus::Pending->isCancelled())->toBeFalse()
             ->and(JobStatus::Processing->isCancelled())->toBeFalse()
             ->and(JobStatus::Completed->isCancelled())->toBeFalse()

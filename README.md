@@ -9,14 +9,14 @@
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/mateffy/laravel-job-progress.svg?style=flat-square)](https://packagist.org/packages/mateffy/laravel-job-progress)
 
-Track and show progress of your background jobs (for progress bar UIs etc.) using Laravel's cache system. Also supports cancelling jobs during execution.
+Track and show progress of your background jobs (for progress bar UIs etc.) using Laravel's cache system. Also supports cancelling jobs during execution and also returning some job result data (e.g. model IDs or other DTOs).
 
 <br />
 
 - [Installation](#installation)
 - [Updating the progress](#updating-the-progress)
 - [Accessing the progress outside the job](#accessing-the-progress-outside-the-job)
-- [Cancelling the job](#cancelling-the-job)
+- [Cancelling a job](#cancelling-the-job)
 - [Progress Lifecycle](#progress-lifecycle)
 - [Defining Progress IDs](#defining-progress-ids)
 - [Customizing Cache Options](#customizing-cache-options)
@@ -38,7 +38,7 @@ Then, implement the `HasJobProgress` interface with the help of the `Progress` t
 use Mateffy\JobProgress\Contracts\HasJobProgress;
 use Mateffy\JobProgress\Traits\Progress;
 
-class SimpleJob implements ShouldQueue, HasJobProgress
+class MyJob implements ShouldQueue, HasJobProgress
 {
     use Queueable;
     use Progress;
@@ -114,6 +114,31 @@ public function handleWithProgress(): void
 }
 ```
 
+### Marking as complete
+
+You don't need to manually mark a job as `completed`, as this will be done automatically if the job handler finishes without errors. If you do wish to do so manually (e.g. to add output/result data) you can use the `complete` method.
+
+```php
+$this->progress()->complete();
+
+// With some data attached:
+$this->progress()->complete(result: $result);
+```
+
+### Marking as failed
+
+You don't need to manually catch exceptions and mark the job as failed. If an exception is thrown, the job will be marked as failed automatically by the `Progress` trait. If you know what you're doing and want to mark a job as failed manually, you can use the `fail` method, which accepts an error message.
+
+**However, I recommend simply throwing an exception instead of manually marking the job as failed, as this leads to better error reporting with other systems (e.g. Flare, Nightwatch, etc.) and also triggers the normal Laravel queue retry logic.
+
+```php
+// Mark as failed by throwing an exception inside the job:
+throw new Exception('This will automatically mark the job as failed');
+
+// If doing soething custom or from outside the job:
+$this->progress()->fail(error: 'Something went wrong');
+```
+
 <br />
 
 ## Accessing the progress outside the job
@@ -125,10 +150,10 @@ All you need to know is the unique job ID (not the full cache key).
 use \Mateffy\JobProgress\Data\JobState;
 
 $id = uniqid();
-UniqueIDJob::dispatch(id: $id);
+MyJob::dispatch(id: $id);
 
 /** @var JobState $state */
-$state = UniqueIDJob::getProgress($id);
+$state = MyJob::getProgress($id);
 $state->progress; // float
 $state->status; // JobStatus enum
 $state->result; // mixed, your own custom result data
@@ -137,7 +162,7 @@ $state->error; // ?string, error message if the job failed
 
 <br />
 
-## Cancelling the job
+## Cancelling a job
 
 This package supports job cancellation.
 This allows a user or the system to cancel a job while it's still running, stopping it from completing.
@@ -154,6 +179,8 @@ For example, you may only want to support cancellation before any data is writte
 #[Cancellable]
 class MyJob implements ShouldQueue, HasJobProgress
 {
+    // ...
+    
     public function handleWithProgress(): void
     {
         $articles = News::recent();
@@ -190,7 +217,7 @@ After calling, the job will exit as soon as possible, without completing any fur
 
 ```php
 /** @var \Mateffy\JobProgress\Data\JobState $state */
-$state = UniqueIDJob::getProgress($id);
+$state = MyJob::getProgress($id);
 $state->cancel();
 ```
 

@@ -9,7 +9,18 @@
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/mateffy/laravel-job-progress.svg?style=flat-square)](https://packagist.org/packages/mateffy/laravel-job-progress)
 
-Track and show progress of your background jobs (for progress bar UIs etc.) using Laravel's cache system.
+Track and show progress of your background jobs (for progress bar UIs etc.) using Laravel's cache system. Also supports cancelling jobs during execution.
+
+<br />
+
+- [Installation](#installation)
+- [Updating the progress](#updating-the-progress)
+- [Accessing the progress outside the job](#accessing-the-progress-outside-the-job)
+- [Cancelling the job](#cancelling-the-job)
+- [Progress Lifecycle](#progress-lifecycle)
+- [Defining Progress IDs](#defining-progress-ids)
+- [Customizing Cache Options](#customizing-cache-options)
+- [Frequently Asked Questions](#frequently-asked-questions)
 
 <br />
 
@@ -307,7 +318,7 @@ class MyLivewire extends Component
 
 <br />
 
-## Customizing the cache prefix/key, duration or the cache store
+## Customizing Cache Options
 
 The default cache key template is `job-progress:{job-class}:{id}`.
 This way, IDs are automatically scoped to the job class, so you don't have to worry about accidentally using the same ID for multiple different kind of jobs.
@@ -318,7 +329,7 @@ See [`JobProgressConfig`](./src/JobProgressConfig.php) for all available options
 
 <br />
 
-## FAQ
+## Frequently Asked Questions
 
 ### Why would I use this package?
 

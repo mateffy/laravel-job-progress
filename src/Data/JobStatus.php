@@ -4,11 +4,11 @@ namespace Mateffy\JobProgress\Data;
 
 enum JobStatus: string
 {
-    case Pending = 'pending';
-    case Processing = 'processing';
-    case Completed = 'completed';
-    case Failed = 'failed';
-    case Cancelled = 'cancelled';
+    case Pending = "pending";
+    case Processing = "processing";
+    case Completed = "completed";
+    case Failed = "failed";
+    case Cancelled = "cancelled";
 
     /**
      * Determine if the job has been running. Pending is counted as running
@@ -85,6 +85,14 @@ enum JobStatus: string
     {
         return match ($this) {
             self::Cancelled => true,
+            default => false,
+        };
+    }
+
+    public function isLocked(): bool
+    {
+        return match ($this) {
+            self::Pending, self::Processing => true,
             default => false,
         };
     }

@@ -36,9 +36,10 @@ trait Progress
     {
         try {
             // Ensure the job is marked as processing.
-            $progress = $this->progress();
-            $progress->exitIfCancelled();
-            $progress->update(0);
+            $progress = $this->progress()
+                ->exitIfProcessing()
+                ->exitIfCancelled()
+                ->update(0);
 
             // Call the actual job logic
             $this->handleWithProgress();

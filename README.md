@@ -152,13 +152,27 @@ use \Mateffy\JobProgress\Data\JobState;
 $id = uniqid();
 MyJob::dispatch(id: $id);
 
-/** @var JobState $state */
+/** @var ?JobState $state */
 $state = MyJob::getProgress($id);
 $state->progress; // float
 $state->status; // JobStatus enum
 $state->result; // mixed, your own custom result data
 $state->error; // ?string, error message if the job failed
 ```
+
+### Locking jobs
+
+The `pending` status can be used to obtain a lock on a job, preventing it from being executed multiple times. Using the `Job::lock($id)` method makes this super easy to setup when dispatching the job.
+
+```php
+if (MyJob::lock($id)) {
+    MyJob::dispatch($id, ...);
+}
+```
+
+The `lock` method will return `null` if any state _already exists_ (even if only `pending`). Otherwise it will create new pending state and return it.
+
+Note that the lock only applies to the progress ID and will only be locked **until it is completed, failed or cancelled**. The same job class can still execute multiple times / in parallel with different IDs. IF you want the job to be entirely unique, make sure your IDs are globally unique or use the default [Laravel job locks](https://laravel.com/docs/12.x/queues#unique-jobs).
 
 <br />
 
@@ -237,18 +251,6 @@ These are indicated by the `JobStatus` enum, available using `$state->status`.
 | JobStatus::Cancelled | The job has been cancelled. |
 
 You don't have to manually mark jobs as `processing`, `completed` or `failed`, as the `Progress` trait and `handleWithProgress` method will take care of this for you (e.g. by catching exceptions).
-
-### Locking jobs
-
-The `pending` status can be used to obtain a lock on a job, preventing it from being executed multiple times. Using the `Job::lock($id)` method makes this super easy to setup when dispatching the job.
-
-```php
-if (MyJob::lock($id)) {
-    MyJob::dispatch($id, ...);
-}
-```
-
-The `lock` method will return `null` if any state _already exists_ (even if only `pending`). Otherwise it will create new state and return it.
 
 <br />
 

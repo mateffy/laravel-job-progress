@@ -5,6 +5,7 @@ namespace Mateffy\JobProgress\Data;
 use Closure;
 use Exception;
 use Mateffy\JobProgress\Contracts\HasJobProgress;
+use Mateffy\JobProgress\Exceptions\JobAlreadyProcessing;
 use Mateffy\JobProgress\Exceptions\JobCannotBeCancelled;
 use Mateffy\JobProgress\Exceptions\JobWasCancelled;
 use Mateffy\JobProgress\JobProgressConfig;
@@ -214,7 +215,7 @@ class JobState
     public function cancel(): self
     {
         if (!$this->canBeCancelled()) {
-            throw new JobCannotBeCancelled();
+            throw new JobCannotBeCancelled(state: $this);
         }
 
         $this->refresh();
@@ -254,10 +255,10 @@ class JobState
      *
      * @throws JobWasCancelled
      */
-    public function exitIfCancelled(?Closure $cleanup = null): void
+    public function exitIfCancelled(?Closure $cleanup = null): self
     {
         if (!$this->status->isCancelled()) {
-            return;
+            return $this;
         }
 
         // Run cleanup if provided
@@ -266,6 +267,28 @@ class JobState
         }
 
         throw new JobWasCancelled(state: $this);
+    }
+
+    /**
+     * Check if the job is already processing and throw a JobAlreadyProcessing if it is.
+     * Is used to validate that a job is not already processing at the beginning of the handler.
+     *
+     * @param Closure|null $cleanup A closure that executes if the job is already processing. Useful for cleaning up resources.
+     *
+     * @throws JobAlreadyProcessing
+     */
+    public function exitIfProcessing(?Closure $cleanup = null): self
+    {
+        if (!$this->status->isProcessing()) {
+            return $this;
+        }
+
+        // Run cleanup if provided
+        if ($cleanup) {
+            $cleanup();
+        }
+
+        throw new JobAlreadyProcessing(state: $this);
     }
 
     /**

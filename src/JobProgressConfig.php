@@ -3,6 +3,7 @@
 namespace Mateffy\JobProgress;
 
 use Closure;
+use Illuminate\Contracts\Cache\LockProvider;
 use Illuminate\Contracts\Cache\Repository;
 use Mateffy\JobProgress\Contracts\HasJobProgress;
 use Mateffy\JobProgress\Data\JobState;
@@ -16,11 +17,11 @@ class JobProgressConfig
 {
     public const string DEFAULT_CACHE_PREFIX = "job-progress";
     public const int DEFAULT_CACHE_DURATION = 60 * 15; // 15 minutes
-    public const string DEFAULT_CACHE_STORE = "default";
+    public const ?string DEFAULT_CACHE_STORE = null;
     public const float DEFAULT_CANCEL_THRESHOLD = 0.0;
 
     public function __construct(
-        protected string $cache_store,
+        protected ?string $cache_store,
         protected string|Closure $cache_prefix,
         protected int $cache_duration,
 
@@ -32,6 +33,8 @@ class JobProgressConfig
 
     /**
      * Get the cache store that job progress / status should be stored in.
+     *
+     * @return Repository|(Repository&LockProvider)
      */
     public function getCache(): Repository
     {
@@ -135,7 +138,11 @@ class JobProgressConfig
             id: $progress->id,
         );
 
-        cache()->put($cacheKey, $progress, ttl: $this->getCacheDuration());
+        $this->getCache()->put(
+            $cacheKey,
+            $progress,
+            ttl: $this->getCacheDuration(),
+        );
     }
 
     /**
@@ -151,7 +158,7 @@ class JobProgressConfig
 
         try {
             /** @var ?JobState<R> $progress */
-            $progress = cache()->get($cacheKey);
+            $progress = $this->getCache()->get($cacheKey);
 
             if ($progress instanceof JobState) {
                 return $progress;
@@ -192,12 +199,36 @@ class JobProgressConfig
      */
     public function lock(string $job, string $id): ?JobState
     {
-        $state = $this->getJobProgress(job: $job, id: $id);
+        $cache = $this->getCache();
 
-        if ($state) {
-            return null;
+        $lock = function () use ($job, $id): ?JobState {
+            $state = $this->getJobProgress(job: $job, id: $id);
+
+            if ($state?->status->isLocked()) {
+                return null;
+            }
+
+            return $this->createPendingState(job: $job, id: $id);
+        };
+
+        // If the cache provider supports locking, we use it
+        // to acquire a lock on the *creation of the job state*.
+        // Note that we're not using the lock to store the job state.
+        // This still avoids race conditions, as we rely on atomic locks
+        // to ensure only one process can create the job state at a time.
+        if ($cache instanceof LockProvider) {
+            $cache_key = $this->composeCacheKey(job: $job, id: $id);
+            $lock_key = "lock_{$cache_key}";
+
+            return $cache
+                // Hold the lock on state creation for max. 5 seconds.
+                ->lock($lock_key, 5)
+                // Wait for max. 5 seconds before giving up acquiring the lock.
+                ->block(seconds: 5, callback: $lock);
+        } else {
+            // If the cache provider does not support locking, we simply call the lock function directly.
+            // This is less safe but at least keeps the job state consistent.
+            return $lock();
         }
-
-        return $this->createPendingState(job: $job, id: $id);
     }
 }

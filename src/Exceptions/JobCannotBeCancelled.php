@@ -3,13 +3,14 @@
 namespace Mateffy\JobProgress\Exceptions;
 
 use Exception;
+use Mateffy\JobProgress\Data\JobState;
 
 class JobCannotBeCancelled extends Exception
 {
-    public function __construct(?string $message = null)
+    public function __construct(public JobState $state)
     {
         parent::__construct(
-            message: $message ?? 'The job cannot be cancelled (any more)',
+            message: "Job {$state->job} with ID {$state->id} is already processing",
         );
     }
 }

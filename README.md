@@ -1,5 +1,8 @@
 <div>
-    <img src="./docs/elephant.svg" />
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="./docs/elephant-dark.svg">
+      <img src="./docs/elephant.svg">
+    </picture>
 </div>
 
 # Job Progress for Laravel Queues

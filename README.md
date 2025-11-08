@@ -388,6 +388,8 @@ The package is also thoroughly tested and documented. I'm planning on keeping th
 
 <br />
 
-## License
+## Copyright & License
 
-Open-Source using the MIT License. Please see the [License File](LICENSE.md) for more information.
+This project was created by [Lukas Mateffy](https://mateffy.me) and is maintained by [Mateffy Software Research](https://mateffy.org).
+
+Open-Sourced using the MIT License. Please see the [License File](LICENSE.md) for more information.

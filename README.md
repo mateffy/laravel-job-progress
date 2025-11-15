@@ -16,7 +16,7 @@ Track and show progress of your background jobs (for progress bar UIs etc.) usin
 - [Installation](#installation)
 - [Updating the progress](#updating-the-progress)
 - [Accessing the progress outside the job](#accessing-the-progress-outside-the-job)
-- [Cancelling a job](#cancelling-the-job)
+- [Cancelling a job](#cancelling-a-job)
 - [Progress Lifecycle](#progress-lifecycle)
 - [Defining Progress IDs](#defining-progress-ids)
 - [Customizing Cache Options](#customizing-cache-options)
@@ -185,9 +185,8 @@ or re-start jobs that are stalled.
 However, cancelling jobs also has a few caveats that you should be aware of too.
 
 If you want your job to support cancellation, you need to add the `#[Cancellable]` attribute and "cancellation checkpoints" to your job code.
-These are places where the job checks if it was cancels, and continues or stops accordingly.
-This way, you retain full control over when a job can actually be stopped, eliminating the possibility of invalid data.
-For example, you may only want to support cancellation before any data is written to the database or any irreversible changes are made.
+These are places where the job checks if it was cancelled, and continues or stops accordingly.
+This way, you retain full control over when a job can actually be stopped, eliminating the possibility of invalid data. For example, you may only want to support cancellation before any data is written to the database or any irreversible changes are made.
 
 ```php
 #[Cancellable]
@@ -233,6 +232,25 @@ After calling, the job will exit as soon as possible, without completing any fur
 /** @var \Mateffy\JobProgress\Data\JobState $state */
 $state = MyJob::getProgress($id);
 $state->cancel();
+```
+
+>![NOTE]
+> It is up to your own code to ensure that the job is cancelled properly. This includes handling any cleanup tasks that may be necessary. 
+
+### Making jobs uncancellable after a specific point
+
+From the outside (frontend etc.) your `#[Cancellable]` job can _always_ be marked as cancelled, until it is complete or has failed. This won't affect the job's _actual_ cancellation (since you're implementing this yourself anyway), but can be confusing from a UX perspective (job looks cancelled, but it's not).
+
+If your job is performing some irreversible operations, you can mark it as `uncancellable` after a certain amount of progress has passed using the `#[Cancellable(threshold: float)]` parameter. This parameter defaults to `1.0` (100%). 
+
+```php
+// Mark job as uncancellable if progress >= 75%
+#[Cancellable(threshold: 0.75)]
+class MyJob extends Job implements Progressable
+{
+    use Progress;
+    // ...
+}
 ```
 
 <br />

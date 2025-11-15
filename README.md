@@ -234,7 +234,7 @@ $state = MyJob::getProgress($id);
 $state->cancel();
 ```
 
->![NOTE]
+> [!IMPORTANT]
 > It is up to your own code to ensure that the job is cancelled properly. This includes handling any cleanup tasks that may be necessary. 
 
 ### Making jobs uncancellable after a specific point

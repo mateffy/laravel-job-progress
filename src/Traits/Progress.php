@@ -51,6 +51,12 @@ trait Progress
             if ($progress->status->isCompleted() === false) {
                 $progress->complete();
             }
+
+            // Track completion durations
+            $this->getProgressConfig()->addToAverageDuration(
+                job: $this->job,
+                duration: $this->duration(),
+            );
         } catch (JobWasCancelled $cancelled) {
             $progress = $this->progress();
 

@@ -2,12 +2,16 @@
 
 namespace Mateffy\JobProgress;
 
+use Carbon\CarbonInterval;
 use Closure;
 use Illuminate\Contracts\Cache\LockProvider;
 use Illuminate\Contracts\Cache\Repository;
+use Illuminate\Support\Carbon;
 use Mateffy\JobProgress\Contracts\HasJobProgress;
+use Mateffy\JobProgress\Data\AverageResolution;
 use Mateffy\JobProgress\Data\JobState;
 use Mateffy\JobProgress\Data\JobStatus;
+use Mateffy\JobProgress\Data\AverageDuration;
 use Throwable;
 
 /**
@@ -27,8 +31,12 @@ class JobProgressConfig
 
         /** @var Closure(class-string<HasJobProgress>, string): string $make_cache_key */
         protected ?Closure $make_cache_key,
+        /** @var Closure(class-string<HasJobProgress>): string $make_global_cache_key */
+        protected ?Closure $make_global_cache_key,
 
         protected float $cancel_threshold,
+
+        protected ?AverageResolution $average_resolution = null,
     ) {}
 
     /**
@@ -87,6 +95,7 @@ class JobProgressConfig
      * By default this prefixes the job ID with the job class name,
      * reducing the chance of collisions when using non-random progress IDs (e.g. with a semantic meaning).
      *
+     * @param class-string<HasJobProgress> $job The job class
      * @param string $id The job progress ID (not the job ID from the database!)
      * @return string
      */
@@ -106,6 +115,27 @@ class JobProgressConfig
     }
 
     /**
+     * Returns the global cache key for the job class.
+     * This is used for things that concern the job as a whole, not each unique execution (e.g. average durations).
+     *
+     * @param class-string<HasJobProgress> $job The job class
+     * @return string
+     */
+    public function composeGlobalCacheKey(string $job): string
+    {
+        if ($this->make_global_cache_key) {
+            return app()->call($this->make_global_cache_key, [
+                "job" => $job,
+            ]);
+        }
+
+        $hash = hash("xxh3", $job);
+        $prefix = $this->getCachePrefix();
+
+        return "{$prefix}:{$hash}";
+    }
+
+    /**
      * Creates and saves a new job state with the given ID and job class.
      *
      * @param class-string<HasJobProgress> $job The job class name
@@ -119,6 +149,7 @@ class JobProgressConfig
             job: $job,
             status: JobStatus::Pending,
             progress: 0.0,
+            created_at: Carbon::now(),
         );
 
         $this->saveJobProgress($progress);
@@ -181,7 +212,7 @@ class JobProgressConfig
 
         return match ($state?->status) {
             default => false,
-            null, JobStatus::Pending, JobStatus::Cancelled => true,
+            null, JobStatus::Pending => true,
             JobStatus::Processing => $state->progress <
                 $this->getCancelThreshold(),
         };
@@ -230,5 +261,47 @@ class JobProgressConfig
             // This is less safe but at least keeps the job state consistent.
             return $lock();
         }
+    }
+
+    public function getAverageDuration(string $job): ?CarbonInterval
+    {
+        if ($this->average_resolution === null) {
+            return null;
+        }
+
+        $cache_key = $this->composeGlobalCacheKey(job: $job);
+        $average_key = "avg_{$cache_key}";
+
+        /** @var ?AverageDuration $average */
+        $average = $this->getCache()->get($average_key);
+
+        if (!$average instanceof AverageDuration) {
+            return null;
+        }
+
+        return $average?->interval();
+    }
+
+    public function addToAverageDuration(
+        string $job,
+        CarbonInterval $duration,
+    ): void {
+        if ($this->average_resolution === null) {
+            return;
+        }
+
+        $cache_key = $this->composeGlobalCacheKey(job: $job);
+        $average_key = "avg_{$cache_key}";
+
+        /** @var ?AverageDuration $average */
+        $average = $this->getCache()->get($average_key);
+
+        $average = $average?->add($duration);
+        $average ??= AverageDuration::new(
+            $this->average_resolution,
+            duration: $duration,
+        );
+
+        $this->getCache()->put($average_key, $average);
     }
 }

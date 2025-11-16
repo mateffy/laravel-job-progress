@@ -2,8 +2,11 @@
 
 namespace Mateffy\JobProgress\Data;
 
+use Carbon\CarbonInterval;
+use Carbon\CarbonPeriod;
 use Closure;
 use Exception;
+use Illuminate\Support\Carbon;
 use Mateffy\JobProgress\Contracts\HasJobProgress;
 use Mateffy\JobProgress\Exceptions\JobAlreadyProcessing;
 use Mateffy\JobProgress\Exceptions\JobCannotBeCancelled;
@@ -22,6 +25,11 @@ class JobState
         public string $job,
         public JobStatus $status,
         public float $progress,
+
+        public Carbon $created_at,
+        public ?Carbon $started_at = null,
+        public ?Carbon $updated_at = null,
+
         public ?string $error = null,
 
         /** @var T $result */
@@ -54,6 +62,10 @@ class JobState
             $this->progress = $refreshed->progress;
             $this->result = $refreshed->result;
             $this->error = $refreshed->error;
+
+            $this->created_at = $refreshed->created_at;
+            $this->started_at = $refreshed->started_at;
+            $this->updated_at = $refreshed->updated_at;
         }
 
         return $this;
@@ -76,8 +88,10 @@ class JobState
         // But: we allow updating the progress for completed / failed jobs without changing the status.
         if ($this->status->isPending()) {
             $this->status = JobStatus::Processing;
+            $this->started_at ??= Carbon::now();
         }
 
+        $this->updated_at = Carbon::now();
         $this->progress = Math::clamp($progress, min: 0, max: 1.0);
         $this->result = $result ?? $this->result;
 
@@ -151,6 +165,7 @@ class JobState
         $this->status = JobStatus::Completed;
         $this->progress = 1.0;
         $this->result = $result ?? $this->result;
+        $this->updated_at = Carbon::now();
 
         $this->getProgressConfig()->saveJobProgress($this);
 
@@ -171,6 +186,7 @@ class JobState
 
         $this->error = $error;
         $this->status = JobStatus::Failed;
+        $this->updated_at = Carbon::now();
 
         $this->getProgressConfig()->saveJobProgress($this);
 
@@ -194,6 +210,10 @@ class JobState
         $this->progress = 0.0;
         $this->result = null;
         $this->status = JobStatus::Pending;
+
+        $this->created_at = Carbon::now();
+        $this->started_at = null;
+        $this->updated_at = null;
 
         $this->getProgressConfig()->saveJobProgress($this);
 
@@ -221,6 +241,7 @@ class JobState
         $this->refresh();
 
         $this->status = JobStatus::Cancelled;
+        $this->updated_at = Carbon::now();
 
         $this->getProgressConfig()->saveJobProgress($this);
 
@@ -300,6 +321,32 @@ class JobState
             job: $this->job,
             id: $this->id,
         );
+    }
+
+    /**
+     * Get the total duration of the currently running job.
+     * By default only counts the time after the job has been marked as processing.
+     * The total time from when the jo
+     *
+     * @param bool $pending Include the time between pending and processing state in the duration.
+     */
+    public function duration(bool $pending = false): CarbonInterval
+    {
+        $start = $pending ? $this->created_at : $this->started_at;
+
+        // If the job is running we use the current time as end time.
+        // Otherwise we use the last status update timestamp.
+        $end = $this->status->isRunning()
+            ? Carbon::now()
+            : $this->updated_at ?? Carbon::now();
+
+        // If we don't start counting from pending state but the job has not been
+        // started yet, return a period of 0.
+        if ($start === null) {
+            return CarbonInterval::millisecond();
+        }
+
+        return $start->diffAsCarbonInterval($end);
     }
 
     public function split(array|int $steps): array

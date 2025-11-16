@@ -14,7 +14,7 @@ class LaravelJobProgressServiceProvider extends PackageServiceProvider
          *
          * More info: https://github.com/spatie/laravel-package-tools
          */
-        $package->name("job-progress")->hasConfigFile()->hasViews();
+        $package->name("job-progress")->hasConfigFile();
     }
 
     public function register(): void

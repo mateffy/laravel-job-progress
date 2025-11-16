@@ -52,11 +52,11 @@ trait Progress
                 $progress->complete();
             }
 
-            // Track completion durations
-            $this->getProgressConfig()->addToAverageDuration(
-                job: $this->job,
-                duration: $this->duration(),
-            );
+            // // Track completion durations
+            // $this->getProgressConfig()->addToAverageDuration(
+            //     job: $this->job,
+            //     duration: $this->duration(),
+            // );
         } catch (JobWasCancelled $cancelled) {
             $progress = $this->progress();
 

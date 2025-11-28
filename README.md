@@ -7,7 +7,9 @@
 
 # Job Progress for Laravel Queues
 
-[![Latest Version on Packagist](https://img.shields.io/packagist/v/mateffy/laravel-job-progress.svg?style=flat-square)](https://packagist.org/packages/mateffy/laravel-job-progress) ![Test Status](https://img.shields.io/github/check-runs/mateffy/laravel-job-progress/main?style=flat-square&label=tests)
+[![Latest Version on Packagist](https://img.shields.io/packagist/v/mateffy/laravel-job-progress.svg?style=flat-square)](https://packagist.org/packages/mateffy/laravel-job-progress) ![Test Status](https://img.shields.io/github/check-runs/mateffy/laravel-job-progress/main?style=flat-square&label=tests) ![Laravel: v11 & v12](https://img.shields.io/badge/laravel-11%20+%2012-f53003?style=flat-square) ![PHP: 8.3+](https://img.shields.io/badge/php-8.3+-4f5b93?style=flat-square)
+
+
 
 
 Track and show progress of your background jobs (for progress bar UIs etc.) using Laravel's cache system. Also supports cancelling jobs during execution and also returning some job result data (e.g. model IDs or other DTOs).
